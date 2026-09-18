@@ -13,10 +13,6 @@
       "destination": "https://beejrakshak.onrender.com/disease/:path*"
     },
     {
-      "source": "/yield-api/:path*",
-      "destination": "https://beejrakshak.onrender.com/yield/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
