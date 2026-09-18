@@ -2388,11 +2388,18 @@ function MandiTab({ profile }) {
             <input
               type="number"
               min="1"
+              max="100000"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="Enter quantity (kg)"
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || (Number(val) >= 1 && Number(val) <= 100000)) {
+                  setQuantity(val);
+                }
+              }}
+              placeholder="Enter quantity (kg, max 100,000)"
               className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-800 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition-all"
             />
+            <p className="text-[10px] text-stone-400 mt-1">Maximum 100,000 kg (1,000 quintals)</p>
           </div>
           <button
             onClick={fetchRecommendation}
@@ -3431,6 +3438,41 @@ function AdvisoryTab({ profile }) {
               </div>
             ))}
           </div>
+          {/* Expected yield estimation */}
+          {profile?.land_area && (
+            <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <span>📊</span> Estimated Production
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-emerald-600 font-semibold text-lg">
+                    {(() => {
+                      const landHa = profile.land_unit?.toLowerCase().includes('acre')
+                        ? Number(profile.land_area) * 0.4047
+                        : Number(profile.land_area);
+                      const benchmarks = YIELD_BENCHMARKS[normalizeStateKey(profile.state)] || YIELD_BENCHMARKS.__default__;
+                      const yieldPerHa = benchmarks[farmerCropData.name] || 0;
+                      return (landHa * yieldPerHa).toFixed(1);
+                    })()} tonnes
+                  </p>
+                  <p className="text-[9px] text-emerald-500">Total expected yield</p>
+                </div>
+                <div>
+                  <p className="text-emerald-600 font-semibold text-lg">
+                    {(() => {
+                      const benchmarks = YIELD_BENCHMARKS[normalizeStateKey(profile.state)] || YIELD_BENCHMARKS.__default__;
+                      return benchmarks[farmerCropData.name]?.toFixed(2) || '—';
+                    })()} t/ha
+                  </p>
+                  <p className="text-[9px] text-emerald-500">State benchmark yield</p>
+                </div>
+              </div>
+              <p className="text-[9px] text-emerald-400 mt-1">
+                Based on {profile.land_area} {profile.land_unit || 'hectare'}{profile.land_unit?.includes('acre') ? 's' : 's'} in {profile.state || 'your state'}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -3542,11 +3584,11 @@ function AdvisoryTab({ profile }) {
                       </span>
                     </div>
                   </div>
-                  {/* Yield badge */}
+                  {/* Yield badge from CROP_DATABASE (state average) */}
                   {c.yieldTpha != null && (
                     <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between">
                       <span className="text-[10px] text-stone-400 flex items-center gap-1">
-                        🌾 Expected Yield
+                        🌾 State Avg. Yield
                         {c.yieldSource === "model" && (
                           <span className="text-[8px] bg-violet-100 text-violet-700 px-1 rounded font-bold">AI</span>
                         )}
@@ -3554,6 +3596,25 @@ function AdvisoryTab({ profile }) {
                       <span className="text-xs font-extrabold text-violet-700">
                         {Number(c.yieldTpha).toFixed(1)} t/ha
                       </span>
+                    </div>
+                  )}
+                  {/* Estimated yield for this crop on farmer's land */}
+                  {profile?.land_area && (
+                    <div className="mt-3 p-2 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-[9px] font-bold text-amber-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                        <span>📈</span> Est. Production on Your Land
+                      </p>
+                      <p className="text-sm font-bold text-amber-600">
+                        {(() => {
+                          const landHa = profile.land_unit?.toLowerCase().includes('acre')
+                            ? Number(profile.land_area) * 0.4047
+                            : Number(profile.land_area);
+                          const benchmarks = YIELD_BENCHMARKS[normalizeStateKey(profile.state)] || YIELD_BENCHMARKS.__default__;
+                          const yieldPerHa = benchmarks[c.name] || 0;
+                          return (landHa * yieldPerHa).toFixed(1);
+                        })()} tonnes total
+                        {yieldPerHa && ` (${yieldPerHa.toFixed(2)} t/ha)`}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -3980,37 +4041,46 @@ function AdaptiveCalendarTab({ profile }) {
     },
   };
 
+  function addDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  const formatDate = (date) =>
+    date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
   const UPCOMING = [
     {
-      date: `${monthName} ${today.getDate() + 2}`,
+      date: formatDate(addDays(today, 2)),
       title: "Scheduled Irrigation",
       desc: "SAR data shows soil moisture dropping to 32%. Irrigate before it reaches critical 25% threshold.",
       icon: "💧",
       color: "border-blue-300 bg-blue-50",
     },
     {
-      date: `${monthName} ${today.getDate() + 4}`,
+      date: formatDate(addDays(today, 4)),
       title: "Nitrogen Application",
       desc: `${crop} in ${stage} stage needs nitrogen boost. Weather window is clear for next 3 days.`,
       icon: "🌿",
       color: "border-emerald-300 bg-emerald-50",
     },
     {
-      date: `${monthName} ${today.getDate() + 7}`,
+      date: formatDate(addDays(today, 7)),
       title: "Preventive Pest Spray",
       desc: "Humidity forecast 82% this week. Apply preventive spray to avoid fungal infection.",
       icon: "🐛",
       color: "border-amber-300 bg-amber-50",
     },
     {
-      date: `${monthName} ${today.getDate() + 12}`,
+      date: formatDate(addDays(today, 12)),
       title: "Pre-Harvest Assessment",
       desc: "NDVI plateau detected. Conduct field inspection to confirm harvest readiness.",
       icon: "📋",
       color: "border-orange-300 bg-orange-50",
     },
     {
-      date: `${monthName} ${today.getDate() + 15}`,
+      date: formatDate(addDays(today, 15)),
       title: "Mandi Price Window",
       desc: `${crop} prices trending up. Optimal selling window projected for this period.`,
       icon: "📊",
