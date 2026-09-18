@@ -24,10 +24,18 @@ export function formatFarmLocationName(profile, geo = null) {
   return 'Your farm'
 }
 
-async function safeFetchJson(url) {
-  const res = await fetch(url)
-  if (!res.ok) return null
-  return res.json()
+async function safeFetchJson(url, init = {}, timeoutMs = 3500) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal })
+    clearTimeout(timer)
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    clearTimeout(timer)
+    return null
+  }
 }
 
 function pickIndiaResult(results, stateHint) {
@@ -59,9 +67,13 @@ async function reverseGeocode(lat, lon) {
     'accept-language': 'en',
   })
   try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 2000)
     const res = await fetch(`${NOMINATIM_REVERSE_URL}?${params}`, {
       headers: { 'User-Agent': 'CropWise/1.0 (farm weather)' },
+      signal: controller.signal,
     })
+    clearTimeout(timer)
     if (!res.ok) return null
     const data = await res.json()
     const addr = data?.address
@@ -102,6 +114,16 @@ export async function resolveFarmCoords(profile) {
   const lon = profile?.longitude
 
   if (hasValidCoords(lat, lon)) {
+    const defaultName = formatFarmLocationName(profile)
+    // Instant fast-path if village or district is already in profile
+    if (profile?.village || profile?.district) {
+      return {
+        lat: Number(lat),
+        lon: Number(lon),
+        name: defaultName,
+        geo: null,
+      }
+    }
     const geo = await reverseGeocode(Number(lat), Number(lon))
     return {
       lat: Number(lat),
@@ -296,9 +318,11 @@ async function fetchOpenMeteoBundle(profile) {
     ].join(','),
     daily: 'sunrise,sunset',
   })
-  const raw = await safeFetchJson(`${OPEN_METEO_FORECAST}?${params}`)
+  const [raw, airQuality] = await Promise.all([
+    safeFetchJson(`${OPEN_METEO_FORECAST}?${params}`),
+    fetchOpenMeteoAirQuality(lat, lon).catch(() => null),
+  ])
   if (!raw) throw new Error('Weather service unavailable (Open-Meteo).')
-  const airQuality = await fetchOpenMeteoAirQuality(lat, lon)
   return {
     weather: mapOpenMeteoCurrent(raw, name),
     forecast: { list: mapOpenMeteoHourlyToOwmList(raw) },
@@ -355,17 +379,43 @@ async function fetchOpenWeatherBundle(profile, apiKey) {
   }
 }
 
+const weatherCache = new Map()
+const pendingWeatherRequests = new Map()
+const CACHE_TTL_MS = 10 * 60 * 1000
+
 /**
  * @returns {Promise<{ weather: object, forecast: { list: array }, airQuality: object | null, location: object }>}
  */
 export async function fetchFarmWeatherBundle(profile) {
-  const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY?.trim()
-  if (apiKey) {
-    try {
-      return await fetchOpenWeatherBundle(profile, apiKey)
-    } catch (e) {
-      console.warn('[farmWeather] OpenWeather failed, using Open-Meteo', e)
-    }
+  const cacheKey = `${profile?.latitude || ''}_${profile?.longitude || ''}_${profile?.village || ''}_${profile?.district || ''}_${profile?.state || ''}`
+  const now = Date.now()
+  const cached = weatherCache.get(cacheKey)
+  if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data
   }
-  return fetchOpenMeteoBundle(profile)
+  if (pendingWeatherRequests.has(cacheKey)) {
+    return pendingWeatherRequests.get(cacheKey)
+  }
+
+  const reqPromise = (async () => {
+    const apiKey = import.meta.env.VITE_OPENWEATHER_API_KEY?.trim()
+    let result = null
+    if (apiKey) {
+      try {
+        result = await fetchOpenWeatherBundle(profile, apiKey)
+      } catch (e) {
+        console.warn('[farmWeather] OpenWeather failed, using Open-Meteo', e)
+      }
+    }
+    if (!result) {
+      result = await fetchOpenMeteoBundle(profile)
+    }
+    weatherCache.set(cacheKey, { timestamp: Date.now(), data: result })
+    return result
+  })().finally(() => {
+    pendingWeatherRequests.delete(cacheKey)
+  })
+
+  pendingWeatherRequests.set(cacheKey, reqPromise)
+  return reqPromise
 }

@@ -34,6 +34,19 @@ function tabFromSearch(query) {
   return null
 }
 
+async function fastFetch(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(timer)
+    return res
+  } catch (err) {
+    clearTimeout(timer)
+    throw err
+  }
+}
+
 export default function DashboardScreen() {
   const [tab, setTab] = useState('overview')
   const [search, setSearch] = useState('')
@@ -92,7 +105,7 @@ export default function DashboardScreen() {
       } catch {}
 
       try {
-        const res = await fetch('https://ipapi.co/json/')
+        const res = await fastFetch('https://ipapi.co/json/', {}, 2000)
         const data = await res.json()
         if (!cancelled && data?.latitude && data?.longitude) {
           setCoords({ lat: data.latitude, lon: data.longitude })
@@ -161,10 +174,10 @@ export default function DashboardScreen() {
       setMandiError('')
       let resolvedBase = base
       try {
-        let healthRes = await fetch(`${base}/health`)
+        let healthRes = await fastFetch(`${base}/health`, {}, 2000)
         if (!healthRes.ok && !base.endsWith('/mandi')) {
           const fallback = `${base}/mandi`
-          healthRes = await fetch(`${fallback}/health`)
+          healthRes = await fastFetch(`${fallback}/health`, {}, 2000)
           if (healthRes.ok) resolvedBase = fallback
         }
         if (!healthRes.ok) throw new Error('API not reachable')
@@ -176,7 +189,7 @@ export default function DashboardScreen() {
           setMandiBase(resolvedBase)
         }
 
-        const mandisRes = await fetch(`${resolvedBase}/mandis`)
+        const mandisRes = await fastFetch(`${resolvedBase}/mandis`, {}, 2500)
         if (mandisRes.ok) {
           const mData = await mandisRes.json()
           const list = mData.mandis || []
@@ -222,11 +235,11 @@ export default function DashboardScreen() {
         if (profile?.village || profile?.district) {
           body.farmer_location = profile?.village || profile?.district
         }
-        const res = await fetch(`${mandiBase}/response`, {
+        const res = await fastFetch(`${mandiBase}/response`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
-        })
+        }, 3500)
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}))
           throw new Error(errData.detail || `Request failed (${res.status})`)
