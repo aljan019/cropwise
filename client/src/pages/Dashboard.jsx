@@ -6,6 +6,7 @@ import { GoogleTranslateWidget } from "../translation";
 import GovernmentSchemes from "../components/GovernmentSchemes";
 
 import FertilizerAdvisor from "../components/FertilizerAdvisor";
+import DiseaseScan from "../components/DiseaseScan";
 
 /* â”€â”€â”€ SVG icon paths â”€â”€â”€ */
 const ICONS = {
@@ -45,7 +46,7 @@ const NAV_ITEMS = [
   { id: "mandi", label: "Mandi Prices", icon: ICONS.mandi },
   { id: "advisory", label: "Crop Advisory", icon: ICONS.advisory },
   { id: "fertilizer", label: "Fertilizer Plan", icon: ICONS.fertilizer },
-
+  { id: "disease", label: "Disease Scan", icon: ICONS.imageQuality },
   { id: "schemes", label: "Govt Schemes", icon: ICONS.schemes },
   { id: "alerts", label: "Alert System", icon: ICONS.alerts },
   { id: "calendar", label: "Adaptive Calendar", icon: ICONS.calendar },
@@ -273,7 +274,7 @@ export default function Dashboard({ session, onSignOut }) {
           {activeTab === "mandi" && <MandiTab profile={profile} />}
           {activeTab === "advisory" && <AdvisoryTab profile={profile} />}
           {activeTab === "fertilizer" && <FertilizerAdvisor profile={profile} />}
-
+          {activeTab === "disease" && <DiseaseScan profile={profile} />}
           {activeTab === "schemes" && <GovernmentSchemes profile={profile} />}
           {activeTab === "alerts" && <AlertSystemTab profile={profile} />}
           {activeTab === "calendar" && (
@@ -2897,19 +2898,24 @@ function statusFromPoints(points, maxPoints) {
   return "bad";
 }
 
-const ADVISORY_SCORE_SCALE = 100 / 70;
-const ADVISORY_TEMPERATURE_MAX_POINTS = 20 * ADVISORY_SCORE_SCALE;
-const ADVISORY_SEASON_MAX_POINTS = 30 * ADVISORY_SCORE_SCALE;
-const ADVISORY_HUMIDITY_MAX_POINTS = 10 * ADVISORY_SCORE_SCALE;
-const ADVISORY_SUNLIGHT_WIND_MAX_POINTS = 10 * ADVISORY_SCORE_SCALE;
-const ADVISORY_SUNLIGHT_MAX_POINTS = ADVISORY_SUNLIGHT_WIND_MAX_POINTS / 2;
-const ADVISORY_WIND_MAX_POINTS = ADVISORY_SUNLIGHT_WIND_MAX_POINTS / 2;
+// Score scale: 4 weather factors sum to 70 pts max → normalise to 100
+// After adding Yield Potential (30 pts), weather factors sum to 70 pts → still 100 total
+const ADVISORY_SCORE_SCALE = 1;  // points are already in 0-100 space
+const ADVISORY_TEMPERATURE_MAX_POINTS = 20;
+const ADVISORY_SEASON_MAX_POINTS = 30;
+const ADVISORY_HUMIDITY_MAX_POINTS = 10;
+const ADVISORY_SUNLIGHT_WIND_MAX_POINTS = 10;
+const ADVISORY_SUNLIGHT_MAX_POINTS = 5;
+const ADVISORY_WIND_MAX_POINTS = 5;
+const ADVISORY_YIELD_MAX_POINTS = 30;  // ← Major new factor
 
 function formatAdvisoryPoints(points) {
-  return Number(points.toFixed(1));
+  // Show clean integers; no trailing decimals
+  const n = Number(points);
+  return Number.isInteger(n) ? n : Math.round(n * 10) / 10;
 }
 
-function calculateCropAdvisoryScore(crop, weather, season) {
+function calculateCropAdvisoryScore(crop, weather, season, options = {}) {
   if (!weather) return { score: 0, factors: [], components: [] };
 
   const temp = weather.main?.temp ?? 25;
@@ -2941,6 +2947,9 @@ function calculateCropAdvisoryScore(crop, weather, season) {
   const sunlightPoints = clouds <= 70 ? ADVISORY_SUNLIGHT_MAX_POINTS : 0;
   const windPoints = windSpeed < 15 ? ADVISORY_WIND_MAX_POINTS : 0;
   const sunWindPoints = sunlightPoints + windPoints;
+
+  // yieldPoints is injected externally by the caller when AI yield data is available
+  const yieldPoints = typeof options?.yieldPoints === "number" ? options.yieldPoints : 0;
 
   const components = [
     {
@@ -3026,6 +3035,26 @@ function calculateCropAdvisoryScore(crop, weather, season) {
             : "Poor operation conditions today.",
       value: `${formatAdvisoryPoints(sunWindPoints)}/${formatAdvisoryPoints(ADVISORY_SUNLIGHT_WIND_MAX_POINTS)}`,
     },
+    {
+      id: "yield-potential",
+      title: "Yield Potential",
+      maxPoints: ADVISORY_YIELD_MAX_POINTS,
+      points: typeof options?.yieldPoints === "number" ? options.yieldPoints : 0,
+      status: statusFromPoints(typeof options?.yieldPoints === "number" ? options.yieldPoints : 0, ADVISORY_YIELD_MAX_POINTS),
+      trigger: `AI yield model`,
+      observed: options?.yieldValue != null ? `${Number(options.yieldValue).toFixed(1)} t/ha` : "Benchmark",
+      formula: (typeof options?.yieldPoints === "number" ? options.yieldPoints : 0) >= ADVISORY_YIELD_MAX_POINTS * 0.75
+        ? "High historical yield potential"
+        : (typeof options?.yieldPoints === "number" ? options.yieldPoints : 0) >= ADVISORY_YIELD_MAX_POINTS * 0.4
+          ? "Moderate yield potential"
+          : "Lower yield potential for this region",
+      action: (typeof options?.yieldPoints === "number" ? options.yieldPoints : 0) >= ADVISORY_YIELD_MAX_POINTS * 0.75
+        ? "Strong yield history — high return crop."
+        : (typeof options?.yieldPoints === "number" ? options.yieldPoints : 0) >= ADVISORY_YIELD_MAX_POINTS * 0.4
+          ? "Moderate returns expected."
+          : "Consider alternatives for better profitability.",
+      value: `${formatAdvisoryPoints(typeof options?.yieldPoints === "number" ? options.yieldPoints : 0)}/${formatAdvisoryPoints(ADVISORY_YIELD_MAX_POINTS)}`,
+    },
   ];
 
   const totalScore = components.reduce((sum, part) => sum + part.points, 0);
@@ -3041,13 +3070,35 @@ function calculateCropAdvisoryScore(crop, weather, season) {
   return { score: Math.round(totalScore), factors, components };
 }
 
-function computeCropSuitability(crop, weather, season) {
-  return calculateCropAdvisoryScore(crop, weather, season);
+function computeCropSuitability(crop, weather, season, options = {}) {
+  return calculateCropAdvisoryScore(crop, weather, season, options);
 }
 
 function AdvisoryTab({ profile }) {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [yieldData, setYieldData] = useState({}); // { cropName: { yieldTpha, yieldPoints } }
+  const [yieldLoading, setYieldLoading] = useState(false);
+
+  // Derive season-to-model-season mapping
+  function getModelSeason(jsSeasonKey) {
+    const map = { kharif: "Kharif", rabi: "Rabi", zaid: "Summer" };
+    return map[jsSeasonKey] || "Kharif";
+  }
+
+  // Model crop name mapping: our DB name → model's known crop name
+  const CROP_MODEL_NAMES = {
+    Tomato: null,      // not in model
+    Onion: "Onion",
+    Potato: "Potato",
+    Rice: "Rice",
+    Wheat: "Wheat",
+    Maize: "Maize",
+    Groundnut: "Groundnut",
+    Soyabean: "Soyabean",
+  };
+
+  const YIELD_BASE_URL = import.meta.env.VITE_YIELD_API_BASE || "/yield-api";
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -3070,6 +3121,76 @@ function AdvisoryTab({ profile }) {
     profile?.state,
   ]);
 
+  // Fetch yield predictions from AI model for all supported crops
+  useEffect(() => {
+    const fetchYields = async () => {
+      setYieldLoading(true);
+      const state = (profile?.state || "Gujarat").toUpperCase();
+      const district = (profile?.district || "SURAT").toUpperCase();
+      const area = Number(profile?.land_area) > 0 ? Number(profile.land_area) : 1;
+      const season = getCurrentSeason();
+      const modelSeason = getModelSeason(season);
+      const year = "2020-21"; // Use most recent available year
+
+      const results = {};
+      const cropsToFetch = CROP_DATABASE.filter(c => CROP_MODEL_NAMES[c.name]);
+
+      await Promise.allSettled(
+        cropsToFetch.map(async (c) => {
+          const modelCrop = CROP_MODEL_NAMES[c.name];
+          try {
+            const res = await fetch(`${YIELD_BASE_URL}/predict`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                state,
+                district,
+                crop: modelCrop,
+                year,
+                season: modelSeason,
+                area,
+              }),
+            });
+            if (!res.ok) throw new Error("API error");
+            const data = await res.json();
+            const yieldTpha = data.predicted_yield ?? 0;
+            // Benchmark for this state
+            const benchmark = getStateBenchmarkYield(profile?.state, c.name);
+            // Score: how much above/below benchmark. Normalized to 30 pts.
+            const ratio = benchmark > 0 ? yieldTpha / benchmark : 0;
+            const yieldPoints = Math.min(ADVISORY_YIELD_MAX_POINTS, Math.round(ratio * ADVISORY_YIELD_MAX_POINTS));
+            results[c.name] = { yieldTpha, yieldPoints, source: "model" };
+          } catch {
+            // Fallback to static benchmark
+            const benchmark = getStateBenchmarkYield(profile?.state, c.name);
+            // Give partial credit (50%) for benchmark-level performance
+            results[c.name] = {
+              yieldTpha: benchmark,
+              yieldPoints: Math.round(ADVISORY_YIELD_MAX_POINTS * 0.5),
+              source: "benchmark",
+            };
+          }
+        })
+      );
+
+      // Crops not in model get benchmark fallback
+      CROP_DATABASE.forEach(c => {
+        if (!results[c.name]) {
+          const benchmark = getStateBenchmarkYield(profile?.state, c.name);
+          results[c.name] = {
+            yieldTpha: benchmark,
+            yieldPoints: Math.round(ADVISORY_YIELD_MAX_POINTS * 0.4),
+            source: "benchmark",
+          };
+        }
+      });
+
+      setYieldData(results);
+      setYieldLoading(false);
+    };
+    fetchYields();
+  }, [profile?.state, profile?.district, profile?.land_area]);
+
   const season = getCurrentSeason();
   const seasonLabel = {
     kharif: "Kharif (Jun-Oct)",
@@ -3077,11 +3198,17 @@ function AdvisoryTab({ profile }) {
     zaid: "Zaid (Mar-Jun)",
   };
 
-  // Score all crops and sort using the new weighted rule engine.
-  const scoredCrops = CROP_DATABASE.map((c) => ({
-    ...c,
-    ...computeCropSuitability(c, weather, season),
-  })).sort((a, b) => b.score - a.score);
+  // Score all crops with yield data injected as options
+  const scoredCrops = CROP_DATABASE.map((c) => {
+    const yd = yieldData[c.name];
+    const options = yd ? { yieldPoints: yd.yieldPoints, yieldValue: yd.yieldTpha } : {};
+    return {
+      ...c,
+      ...computeCropSuitability(c, weather, season, options),
+      yieldTpha: yd?.yieldTpha ?? null,
+      yieldSource: yd?.source ?? null,
+    };
+  }).sort((a, b) => b.score - a.score);
 
   const topCrops = scoredCrops.filter((c) => c.score >= 60);
   const otherCrops = scoredCrops.filter((c) => c.score < 60);
@@ -3114,16 +3241,51 @@ function AdvisoryTab({ profile }) {
             AI Crop Advisory
           </h2>
           <p className="text-xs text-stone-400">
-            Real-time crop recommendations based on weather, season, and
-            location
+            Recommendations from weather, season, location + AI yield model
           </p>
         </div>
-        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-xs font-bold text-emerald-700">
-            {seasonLabel[season]}
+        <div className="flex items-center gap-2">
+          {yieldLoading && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-full">
+              <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+              <span className="text-[10px] font-bold text-amber-700">Yield model running...</span>
+            </span>
+          )}
+          {!yieldLoading && Object.keys(yieldData).length > 0 && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full">
+              <span className="text-emerald-600 text-xs">🌾</span>
+              <span className="text-[10px] font-bold text-emerald-700">Yield AI Active</span>
+            </span>
+          )}
+          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-bold text-emerald-700">
+              {seasonLabel[season]}
+            </span>
           </span>
-        </span>
+        </div>
+      </div>
+
+      {/* Yield Intelligence Hero Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 p-5 md:p-6 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-44 h-44 bg-white/[0.04] rounded-full -translate-y-1/3 translate-x-1/4" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/[0.03] rounded-full translate-y-1/2 -translate-x-1/4" />
+        <div className="relative z-10 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-violet-200 text-[10px] font-bold uppercase tracking-widest">⭐ Highlighted Feature</p>
+            <h3 className="text-lg font-extrabold mt-1 flex items-center gap-2">
+              <span>🌾</span> Yield Intelligence Engine
+            </h3>
+            <p className="text-violet-100/70 text-xs mt-1.5 max-w-lg">
+              Our ML model trained on <span className="text-white font-semibold">district-level historical harvest data</span> predicts expected yield (tonnes/hectare) for your location. This is factored as a <span className="text-white font-semibold">30-point major factor</span> in suitability scoring — crops with strong yield history in your region rank higher.
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-violet-200 text-[10px] uppercase tracking-wider">Yield Factor Weight</p>
+            <p className="text-3xl font-extrabold">30<span className="text-lg text-violet-200">pt</span></p>
+            <p className="text-violet-200/70 text-[10px]">out of 100 total</p>
+          </div>
+        </div>
       </div>
 
       {/* Hero */}
@@ -3233,6 +3395,11 @@ function AdvisoryTab({ profile }) {
                 {farmerCropData.score}%
               </p>
               <p className="text-[10px] text-stone-400">suitability</p>
+              {farmerCropData.yieldTpha != null && (
+                <p className="text-[10px] font-bold text-violet-600 mt-1">
+                  🌾 {Number(farmerCropData.yieldTpha).toFixed(1)} t/ha
+                </p>
+              )}
             </div>
           </div>
           <div className="h-2.5 rounded-full bg-stone-200">
@@ -3277,8 +3444,7 @@ function AdvisoryTab({ profile }) {
               Recommended Crops for Your Farm
             </h3>
             <p className="text-xs text-stone-400 mt-0.5">
-              Ranked by AI suitability score - based on weather, season, and
-              soil conditions
+              Ranked by AI suitability score — weather, season, location &amp; yield model
             </p>
           </div>
           <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
@@ -3376,6 +3542,20 @@ function AdvisoryTab({ profile }) {
                       </span>
                     </div>
                   </div>
+                  {/* Yield badge */}
+                  {c.yieldTpha != null && (
+                    <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between">
+                      <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                        🌾 Expected Yield
+                        {c.yieldSource === "model" && (
+                          <span className="text-[8px] bg-violet-100 text-violet-700 px-1 rounded font-bold">AI</span>
+                        )}
+                      </span>
+                      <span className="text-xs font-extrabold text-violet-700">
+                        {Number(c.yieldTpha).toFixed(1)} t/ha
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -3429,15 +3609,15 @@ function AdvisoryTab({ profile }) {
       {/* Seasonal planting guide */}
       <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5">
         <h4 className="font-bold text-stone-800 text-sm mb-3">
-          How AI scores are calculated
+          How AI scores are calculated (total = 100 points)
         </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs text-stone-600">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs text-stone-600">
           <div className="flex gap-2">
             <span className="text-emerald-600 font-extrabold shrink-0">
               {formatAdvisoryPoints(ADVISORY_TEMPERATURE_MAX_POINTS)}pt
             </span>
             <span>
-              Temperature Match - {formatAdvisoryPoints(ADVISORY_TEMPERATURE_MAX_POINTS)} perfect, {formatAdvisoryPoints(ADVISORY_TEMPERATURE_MAX_POINTS / 2)} survivable, 0 extreme stress
+              Temperature Match — {formatAdvisoryPoints(ADVISORY_TEMPERATURE_MAX_POINTS)} perfect, {formatAdvisoryPoints(ADVISORY_TEMPERATURE_MAX_POINTS / 2)} survivable, 0 extreme stress
             </span>
           </div>
           <div className="flex gap-2">
@@ -3445,7 +3625,7 @@ function AdvisoryTab({ profile }) {
               {formatAdvisoryPoints(ADVISORY_SEASON_MAX_POINTS)}pt
             </span>
             <span>
-              Season Alignment - {formatAdvisoryPoints(ADVISORY_SEASON_MAX_POINTS)} correct season, {formatAdvisoryPoints(ADVISORY_SEASON_MAX_POINTS / 2)} early/late, 0 wrong season
+              Season Alignment — {formatAdvisoryPoints(ADVISORY_SEASON_MAX_POINTS)} correct season, {formatAdvisoryPoints(ADVISORY_SEASON_MAX_POINTS / 2)} early/late, 0 wrong season
             </span>
           </div>
           <div className="flex gap-2">
@@ -3453,7 +3633,7 @@ function AdvisoryTab({ profile }) {
               {formatAdvisoryPoints(ADVISORY_HUMIDITY_MAX_POINTS)}pt
             </span>
             <span>
-              Humidity Match - {formatAdvisoryPoints(ADVISORY_HUMIDITY_MAX_POINTS)} optimal, {formatAdvisoryPoints(ADVISORY_HUMIDITY_MAX_POINTS / 2)} too humid or too dry
+              Humidity Match — {formatAdvisoryPoints(ADVISORY_HUMIDITY_MAX_POINTS)} optimal, {formatAdvisoryPoints(ADVISORY_HUMIDITY_MAX_POINTS / 2)} too humid or too dry
             </span>
           </div>
           <div className="flex gap-2">
@@ -3461,7 +3641,15 @@ function AdvisoryTab({ profile }) {
               {formatAdvisoryPoints(ADVISORY_SUNLIGHT_WIND_MAX_POINTS)}pt
             </span>
             <span>
-              Sunlight &amp; Wind - {formatAdvisoryPoints(ADVISORY_SUNLIGHT_MAX_POINTS)} for adequate sunlight + {formatAdvisoryPoints(ADVISORY_WIND_MAX_POINTS)} for calm winds
+              Sunlight &amp; Wind — {formatAdvisoryPoints(ADVISORY_SUNLIGHT_MAX_POINTS)} adequate sunlight + {formatAdvisoryPoints(ADVISORY_WIND_MAX_POINTS)} calm winds
+            </span>
+          </div>
+          <div className="flex gap-2 bg-violet-50 border border-violet-200 rounded-xl px-2 py-1.5">
+            <span className="text-violet-600 font-extrabold shrink-0">
+              {formatAdvisoryPoints(ADVISORY_YIELD_MAX_POINTS)}pt
+            </span>
+            <span className="text-violet-700 font-medium">
+              🌾 Yield Potential — AI-predicted t/ha vs. state benchmark. Major factor.
             </span>
           </div>
         </div>

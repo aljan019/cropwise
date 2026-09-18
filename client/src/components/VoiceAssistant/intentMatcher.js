@@ -29,6 +29,19 @@ export const NAVIGATION_KEYWORDS = {
     hi: ["खाद", "उर्वरक", "उर्वरक योजना", "खाद सलाह"],
     gu: ["ખાતર", "ખાતર યોજના", "ખાતર સલાહ"],
   },
+  disease: {
+    en: [
+      "disease",
+      "disease scan",
+      "leaf disease",
+      "plant disease",
+      "scan leaf",
+      "crop disease",
+      "show disease",
+    ],
+    hi: ["रोग", "पत्ती रोग", "रोग जाँच", "बीमारी"],
+    gu: ["રોગ", "પાંદડાનો રોગ", "રોગ તપાસ"],
+  },
   schemes: {
     en: [
       "scheme",
@@ -83,7 +96,7 @@ const FAQ_ENTRIES = [
       gu: ["ક્રોપવાઇઝ શું છે", "બીજરક્ષક શું છે", "આ એપ વિશે"],
     },
     replies: {
-      en: "CropWise (BeejRakshak) is an agricultural AI platform for Indian farmers. It helps with mandi prices, crop advisory, fertilizer plans, government schemes, weather, and alerts — all in one dashboard.",
+      en: "CropWise (BeejRakshak) is an agricultural AI platform for Indian farmers. It helps with mandi prices, crop advisory, fertilizer plans, leaf disease scan, government schemes, weather, and alerts — all in one dashboard.",
       hi: "क्रॉपवाइज (बीजरक्षक) भारतीय किसानों के लिए एक कृषि AI प्लेटफॉर्म है। यह मंडी भाव, फसल सलाह, उर्वरक योजना, सरकारी योजनाएं, मौसम और अलर्ट — सब एक ही डैशबोर्ड में देता है।",
       gu: "ક્રોપવાઇઝ (બીજરક્ષક) ભારતીય ખેડૂતો માટે કૃષિ AI પ્લેટફોર્મ છે. તે મંડી ભાવ, પાક સલાહ, ખાતર યોજના, સરકારી યોજનાઓ, હવામાન અને ચેતવણી — બધું એક ડેશબોર્ડમાં આપે છે.",
     },
@@ -141,6 +154,20 @@ const FAQ_ENTRIES = [
     suggestTab: "mandi",
   },
   {
+    id: "disease_how",
+    keywords: {
+      en: ["how disease scan", "scan my leaf", "identify disease", "leaf photo"],
+      hi: ["रोग कैसे जाँचें", "पत्ती फोटो", "बीमारी पहचान"],
+      gu: ["રોગ કેવી રીતે તપાસવો", "પાંદડાનો ફોટો"],
+    },
+    replies: {
+      en: "Open Disease Scan, upload a clear daylight photo of one leaf, and CropWise-Ai will predict the crop and condition with treatment advice.",
+      hi: "रोग जाँच खोलें, एक पत्ती की साफ दिन की फोटो अपलोड करें, और CropWise-Ai फसल और रोग बताकर सलाह देगा।",
+      gu: "રોગ તપાસ ખોલો, એક પાંદડાનો સ્પષ્ટ ફોટો અપલોડ કરો, અને CropWise-Ai પાક અને રોગ જણાવી સલાહ આપશે.",
+    },
+    suggestTab: "disease",
+  },
+  {
     id: "help",
     keywords: {
       en: ["help", "what can you do", "commands", "how to use"],
@@ -148,7 +175,7 @@ const FAQ_ENTRIES = [
       gu: ["મદદ", "તમે શું કરી શકો", "આદેશ", "કેવી રીતે વાપરવું"],
     },
     replies: {
-      en: "I can navigate you to Mandi Prices, Fertilizer Plan, Govt Schemes, Alerts, Weather, Crop Advisory, and more. Try: \"Show mandi prices\" or \"Open fertilizer plan\". You can type or use the microphone.",
+      en: "I can navigate you to Mandi Prices, Fertilizer Plan, Disease Scan, Govt Schemes, Alerts, Weather, Crop Advisory, and more. Try: \"Show mandi prices\" or \"Open disease scan\". You can type or use the microphone.",
       hi: "मैं आपको मंडी भाव, उर्वरक योजना, सरकारी योजनाएं, अलर्ट, मौसम, फसल सलाह आदि पर ले जा सकता हूं। कोशिश करें: \"मंडी भाव दिखाओ\" या \"उर्वरक योजना खोलो\"।",
       gu: "હું તમને મંડી ભાવ, ખાતર યોજના, સરકારી યોજનાઓ, ચેતવણી, હવામાન, પાક સલાહ વગેરે પર લઈ જઈ શકું. પ્રયત્ન કરો: \"મંડી ભાવ બતાવો\" અથવા \"ખાતર યોજના ખોલો\".",
     },

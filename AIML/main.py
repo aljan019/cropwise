@@ -1,9 +1,6 @@
 import sys
 import os
-import re
-import subprocess
 from pathlib import Path
-from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -36,6 +33,14 @@ from mandi_intelligence.api.main import (
 from fertilizer_router import router as fertilizer_router
 
 try:
+    from disease_detection.predict import router as disease_router
+    disease_loaded = True
+except Exception as e:
+    disease_loaded = False
+    disease_router = None
+    print("WARNING: Disease detection not loaded:", e)
+
+try:
     from scrapbot.src.main import app as scrapbot_app
     scrapbot_loaded = True
 except Exception as e:
@@ -43,6 +48,19 @@ except Exception as e:
     scrapbot_app = None
     # Windows terminals may not support emoji in stdout encoding; keep logs ASCII.
     print("WARNING: Scheme assistant not loaded (install fpdf for full support):", e)
+
+try:
+    # Override YIELD_ARTIFACT_DIR to point at our local copy of the artifacts
+    os.environ.setdefault(
+        "YIELD_ARTIFACT_DIR",
+        str(BASE_DIR / "yield_service" / "artifacts"),
+    )
+    from yield_service.app import app as yield_app
+    yield_loaded = True
+except Exception as _ye:
+    yield_loaded = False
+    yield_app = None
+    print("WARNING: Yield service not loaded:", _ye)
 
 # Create the Master App
 app = FastAPI(
@@ -62,8 +80,11 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:19006",
+        "http://127.0.0.1:19006",
     ],
-    allow_origin_regex=r"https://crop-wise.*\.vercel\.app",
+    allow_origin_regex=r"(https://crop-wise.*\.vercel\.app|http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+):\d+)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,7 +95,11 @@ app.add_middleware(
 app.mount("/mandi", mandi_app)
 if scrapbot_loaded:
     app.mount("/schemes", scrapbot_app)
+if yield_loaded:
+    app.mount("/yield", yield_app)
 app.include_router(fertilizer_router, prefix="/api")
+if disease_loaded:
+    app.include_router(disease_router, prefix="/disease")
 
 @app.on_event("startup")
 async def startup_event():
@@ -95,6 +120,8 @@ def root():
         "modules": {
             "mandi_intelligence": "/mandi/docs",
             "scheme_assistant": "/schemes/docs",
+            "disease_detection": "/disease/health" if disease_loaded else "unavailable",
+            "yield": "/yield/docs" if yield_loaded else "unavailable",
         },
         "status": "operational"
     }
@@ -132,140 +159,7 @@ class SchemeRequest(BaseModel):
     category: str
 
 
-class YieldBatchRequest(BaseModel):
-    state: str
-    district: str
-    season: str
-    year: str
-    area: float
-    area_units: str = "Hectare"
-    crops: List[str]
 
-
-_DEFAULT_YIELD_MODEL_DIR = Path(
-    r"C:\Users\Hardik\OneDrive\Desktop\Agency\yield_model\deploy_no_production"
-)
-_FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-
-
-def _yield_model_dir() -> Path:
-    return Path(os.getenv("YIELD_MODEL_DIR", str(_DEFAULT_YIELD_MODEL_DIR)))
-
-
-def _yield_model_path() -> Path:
-    default_model = _yield_model_dir() / "yield_model_no_production.bin"
-    return Path(os.getenv("YIELD_MODEL_PATH", str(default_model)))
-
-
-def _run_yield_prediction(
-    *,
-    state: str,
-    district: str,
-    crop: str,
-    year: str,
-    season: str,
-    area: float,
-    area_units: str,
-) -> float:
-    model_dir = _yield_model_dir()
-    model_path = _yield_model_path()
-    java_bin = os.getenv("YIELD_JAVA_BIN", "java")
-    timeout_sec = float(os.getenv("YIELD_PREDICT_TIMEOUT_SEC", "12"))
-
-    if not model_dir.exists():
-        raise FileNotFoundError(f"Yield model directory not found: {model_dir}")
-    if not model_path.exists():
-        raise FileNotFoundError(f"Yield model file not found: {model_path}")
-
-    cmd = [
-        java_bin,
-        "PredictYield",
-        "--model",
-        str(model_path),
-        "--state",
-        state,
-        "--district",
-        district,
-        "--crop",
-        crop,
-        "--year",
-        year,
-        "--season",
-        season,
-        "--area",
-        str(area),
-        "--area-units",
-        area_units,
-    ]
-
-    completed = subprocess.run(
-        cmd,
-        cwd=str(model_dir),
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        check=False,
-    )
-    if completed.returncode != 0:
-        err = (completed.stderr or completed.stdout or "").strip()
-        if not err:
-            err = f"PredictYield exited with code {completed.returncode}"
-        raise RuntimeError(err)
-
-    output = (completed.stdout or "").strip()
-    if not output:
-        raise RuntimeError("PredictYield returned empty output")
-
-    lines = [line.strip() for line in output.splitlines() if line.strip()]
-    candidate = lines[-1] if lines else output
-    try:
-        return float(candidate)
-    except ValueError:
-        match = _FLOAT_RE.search(candidate)
-        if not match:
-            raise RuntimeError(f"Could not parse model output: {candidate}") from None
-        return float(match.group(0))
-
-
-@app.post("/yield/predict-batch")
-def yield_predict_batch(request: YieldBatchRequest):
-    if request.area <= 0:
-        raise HTTPException(status_code=400, detail="area must be > 0")
-
-    crops = [c.strip() for c in request.crops if c and c.strip()]
-    if not crops:
-        raise HTTPException(status_code=400, detail="crops list is empty")
-
-    predictions = []
-    for crop in crops:
-        try:
-            pred = _run_yield_prediction(
-                state=request.state,
-                district=request.district,
-                crop=crop,
-                year=request.year,
-                season=request.season,
-                area=request.area,
-                area_units=request.area_units,
-            )
-            predictions.append({"crop": crop, "predicted_yield": pred})
-        except Exception as exc:
-            predictions.append(
-                {"crop": crop, "predicted_yield": None, "error": str(exc)}
-            )
-
-    return {
-        "status": "success",
-        "input": {
-            "state": request.state,
-            "district": request.district,
-            "season": request.season,
-            "year": request.year,
-            "area": request.area,
-            "area_units": request.area_units,
-        },
-        "predictions": predictions,
-    }
 
 
 if not scrapbot_loaded:
@@ -279,4 +173,4 @@ if not scrapbot_loaded:
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)

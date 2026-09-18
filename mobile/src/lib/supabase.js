@@ -3,16 +3,33 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient } from '@supabase/supabase-js'
 import { config } from './config'
 
-const supabaseUrl = config.SUPABASE_URL
-const supabaseAnonKey = config.SUPABASE_ANON_KEY
+const supabaseUrl = config.SUPABASE_URL || ''
+const supabaseAnonKey = config.SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    persistSession: false,
-    autoRefreshToken: false,
+const PLACEHOLDER_PATTERNS = [
+  /YOUR_PROJECT_REF/i,
+  /your-supabase-anon-key/i,
+  /example\.com/i,
+  /placeholder/i,
+]
+
+export function isSupabaseConfigured() {
+  if (!supabaseUrl?.trim() || !supabaseAnonKey?.trim()) return false
+  const combined = `${supabaseUrl} ${supabaseAnonKey}`
+  return !PLACEHOLDER_PATTERNS.some((re) => re.test(combined))
+}
+
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key',
+  {
+    auth: {
+      storage: AsyncStorage,
+      persistSession: false,
+      autoRefreshToken: false,
+    },
   },
-})
+)
 
 export function formatSupabaseQueryError(err) {
   if (!err) return 'Something went wrong. Please try again.'

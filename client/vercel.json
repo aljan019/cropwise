@@ -5,6 +5,14 @@
       "destination": "https://beejrakshak.onrender.com/mandi/:path*"
     },
     {
+      "source": "/disease-api/:path*",
+      "destination": "https://beejrakshak.onrender.com/disease/:path*"
+    },
+    {
+      "source": "/disease/:path*",
+      "destination": "https://beejrakshak.onrender.com/disease/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

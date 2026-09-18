@@ -1,25 +1,43 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { SafeAreaView, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native'
 import * as Location from 'expo-location'
-import { colors, spacing } from '../theme'
+import { colors } from '../theme'
 import Section from '../components/Section'
 import StatCard from '../components/StatCard'
 import Badge from '../components/Badge'
+import DiseaseScanTab from '../components/DiseaseScanTab'
+import FertilizerTab from '../components/FertilizerTab'
+import SchemesTab from '../components/SchemesTab'
 import { useAuth } from '../context/AuthContext'
 import { fetchRegistration } from '../lib/registration'
-import { config } from '../lib/config'
 import { fetchFarmWeatherBundle } from '../lib/farmWeather'
+import { apiUrl } from '../lib/api'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'mandi', label: 'Mandi' },
+  { id: 'disease', label: 'Disease' },
+  { id: 'fertilizer', label: 'Fertilizer' },
+  { id: 'schemes', label: 'Schemes' },
   { id: 'advisory', label: 'Advisory' },
   { id: 'alerts', label: 'Alerts' },
 ]
 
+function tabFromSearch(query) {
+  const q = String(query || '').toLowerCase()
+  if (/disease|leaf|scan|blight|pest/.test(q)) return 'disease'
+  if (/fertilizer|npk|urea|dap/.test(q)) return 'fertilizer'
+  if (/scheme|pmfby|subsidy|insurance/.test(q)) return 'schemes'
+  if (/mandi|price|market/.test(q)) return 'mandi'
+  if (/alert|heat|rain watch/.test(q)) return 'alerts'
+  if (/weather|advisory|spray|irrigat/.test(q)) return 'advisory'
+  return null
+}
+
 export default function DashboardScreen() {
   const [tab, setTab] = useState('overview')
-  const { session } = useAuth()
+  const [search, setSearch] = useState('')
+  const { session, signOut } = useAuth()
   const [profile, setProfile] = useState(null)
   const [coords, setCoords] = useState(null)
   const [weather, setWeather] = useState(null)
@@ -136,7 +154,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     let cancelled = false
-    const base = (config.MANDI_API_BASE || 'http://localhost:8000/mandi').replace(/\/$/, '')
+    const base = apiUrl('/mandi')
 
     async function initMandi() {
       setMandiLoading(true)
@@ -234,8 +252,15 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Header />
-        <SearchBar />
+        <Header profile={profile} onSignOut={signOut} />
+        <SearchBar
+          value={search}
+          onChangeText={(text) => {
+            setSearch(text)
+            const next = tabFromSearch(text)
+            if (next) setTab(next)
+          }}
+        />
         <View style={styles.tabsRow}>
           {TABS.map((t) => (
             <TouchableOpacity key={t.id} onPress={() => setTab(t.id)} style={[styles.tabPill, tab === t.id && styles.tabPillActive]}>
@@ -251,6 +276,7 @@ export default function DashboardScreen() {
             forecastDays={forecastDays}
             recommendation={recommendation}
             weatherLoading={weatherLoading}
+            onOpenTab={setTab}
           />
         )}
         {tab === 'mandi' && (
@@ -267,6 +293,9 @@ export default function DashboardScreen() {
             quantity={quantity}
           />
         )}
+        {tab === 'disease' && <DiseaseScanTab profile={profile} />}
+        {tab === 'fertilizer' && <FertilizerTab profile={profile} />}
+        {tab === 'schemes' && <SchemesTab profile={profile} />}
         {tab === 'advisory' && (
           <AdvisoryTab
             profile={profile}
@@ -286,7 +315,13 @@ export default function DashboardScreen() {
   )
 }
 
-function Header() {
+function Header({ profile, onSignOut }) {
+  const initials = String(profile?.farmer_name || profile?.name || 'CW')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'CW'
   return (
     <View style={styles.header}>
       <View style={styles.brand}>
@@ -298,26 +333,28 @@ function Header() {
           <Text style={styles.subtitle}>AgriTech Intelligence</Text>
         </View>
       </View>
-      <View style={styles.profile}>
-        <Text style={styles.profileText}>HM</Text>
-      </View>
+      <TouchableOpacity style={styles.profile} onPress={onSignOut} accessibilityLabel="Sign out">
+        <Text style={styles.profileText}>{initials}</Text>
+      </TouchableOpacity>
     </View>
   )
 }
 
-function SearchBar() {
+function SearchBar({ value, onChangeText }) {
   return (
     <View style={styles.searchWrap}>
       <TextInput
         style={styles.search}
-        placeholder="Search mandis, alerts, advisories"
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="Search disease, mandi, fertilizer, schemes"
         placeholderTextColor="#7FB69B"
       />
     </View>
   )
 }
 
-function OverviewTab({ profile, weather, forecastDays, recommendation, weatherLoading }) {
+function OverviewTab({ profile, weather, forecastDays, recommendation, weatherLoading, onOpenTab }) {
   const cropLabel = profile?.primary_crop ? cap(profile.primary_crop) : 'Onion'
   const stageLabel = profile?.crop_stage ? cap(profile.crop_stage) : 'Vegetative'
   const riskLabel = weather?.main?.temp > 35 ? 'High' : weather?.main?.temp > 30 ? 'Moderate' : 'Low'
@@ -343,6 +380,45 @@ function OverviewTab({ profile, weather, forecastDays, recommendation, weatherLo
         ) : (
           <WeatherRow days={forecastDays} />
         )}
+      </Section>
+      <Section title="AI Crop Health & Disease Scan" subtitle="Powered by CropWise-Ai Vision Transformer">
+        <TouchableOpacity
+          style={styles.aiScanHeroCard}
+          onPress={() => onOpenTab('disease')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.aiScanLeft}>
+            <View style={styles.aiScanIconWrap}>
+              <Text style={{ fontSize: 24 }}>🍃</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.aiScanTitle}>Instant Leaf Disease Diagnosis</Text>
+              <Text style={styles.aiScanSubtitle}>
+                Photograph any leaf to detect disease across 38 classes with treatment and organic remedies.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.aiScanAction}>
+            <Text style={styles.aiScanActionText}>Scan Leaf →</Text>
+          </View>
+        </TouchableOpacity>
+      </Section>
+
+      <Section title="Quick actions" subtitle="Open the rest of the farm flow">
+        <View style={styles.pillRow}>
+          <TouchableOpacity onPress={() => onOpenTab('disease')}>
+            <Badge label="Scan leaf" tone="accent" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onOpenTab('fertilizer')}>
+            <Badge label="NPK plan" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onOpenTab('schemes')}>
+            <Badge label="Govt schemes" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onOpenTab('mandi')}>
+            <Badge label="Mandi prices" />
+          </TouchableOpacity>
+        </View>
       </Section>
     </View>
   )
@@ -623,4 +699,48 @@ const styles = StyleSheet.create({
   mandiName: { color: colors.text, fontSize: 13, fontWeight: '600' },
   mandiMeta: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
   mandiTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  aiScanHeroCard: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+    padding: 16,
+    gap: 12,
+  },
+  aiScanLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  aiScanIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#143126',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiScanTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  aiScanSubtitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  aiScanAction: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.accentDark,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  aiScanActionText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
 })

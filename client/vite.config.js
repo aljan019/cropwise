@@ -23,6 +23,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (proxyPath) => proxyPath.replace(/^\/schemes-api/, '/schemes'),
       },
+      '/yield-api': {
+        target: AIML_TARGET,
+        changeOrigin: true,
+        rewrite: (proxyPath) => proxyPath.replace(/^\/yield-api/, '/yield'),
+      },
+      '/disease-api': {
+        target: AIML_TARGET,
+        changeOrigin: true,
+        rewrite: (proxyPath) => proxyPath.replace(/^\/disease-api/, '/disease'),
+      },
 
       '/tts-api': {
         target: AIML_TARGET,

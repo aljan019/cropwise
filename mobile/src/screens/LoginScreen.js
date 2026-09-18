@@ -2,7 +2,8 @@ import React, { useState } from 'react'
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { colors, spacing } from '../theme'
-import { supabase, setLocalSession, formatSupabaseQueryError } from '../lib/supabase'
+import { supabase, setLocalSession, formatSupabaseQueryError, isSupabaseConfigured } from '../lib/supabase'
+import { saveRegistration } from '../lib/registration'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginScreen({ navigation }) {
@@ -20,11 +21,22 @@ export default function LoginScreen({ navigation }) {
     if (!name.trim()) { setError('Please enter your name.'); return }
     if (mobile.length !== 10) { setError('Please enter a valid 10-digit mobile number.'); return }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('farmers')
-      .insert({ name: name.trim(), mobile })
-      .select()
-      .single()
+
+    let data = null
+    let err = null
+
+    if (isSupabaseConfigured()) {
+      const res = await supabase
+        .from('farmers')
+        .insert({ name: name.trim(), mobile })
+        .select()
+        .single()
+      data = res.data
+      err = res.error
+    } else {
+      data = { id: 'local_' + mobile, name: name.trim(), mobile }
+    }
+
     setLoading(false)
     if (err) {
       if (err.code === '23505') setError('This mobile number is already registered. Try signing in.')
@@ -42,11 +54,22 @@ export default function LoginScreen({ navigation }) {
     setError('')
     if (mobile.length !== 10) { setError('Please enter a valid 10-digit mobile number.'); return }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('farmers')
-      .select('*')
-      .eq('mobile', mobile)
-      .maybeSingle()
+
+    let data = null
+    let err = null
+
+    if (isSupabaseConfigured()) {
+      const res = await supabase
+        .from('farmers')
+        .select('*')
+        .eq('mobile', mobile)
+        .maybeSingle()
+      data = res.data
+      err = res.error
+    } else {
+      data = { id: 'local_' + mobile, name: 'Farmer', mobile }
+    }
+
     setLoading(false)
     if (err) {
       console.error(err)
@@ -55,6 +78,36 @@ export default function LoginScreen({ navigation }) {
     }
     if (!data) { setError('No account found with this number. Please sign up first.'); return }
     await setLocalSession(data)
+    await refresh()
+  }
+
+  async function handleDemoLogin() {
+    setLoading(true)
+    setError('')
+    const demoFarmer = {
+      id: 'demo_farmer_01',
+      name: 'Ramesh Patel',
+      mobile: '9876543210',
+    }
+    await setLocalSession(demoFarmer)
+    // Pre-populate registration so user lands directly on the dashboard
+    await saveRegistration(demoFarmer.id, {
+      farmerName: 'Ramesh Patel',
+      mobile: '9876543210',
+      preferredLanguage: 'en',
+      village: 'Visnagar',
+      district: 'Mehsana',
+      state: 'Gujarat',
+      latitude: 23.6983,
+      longitude: 72.5489,
+      landArea: 2.5,
+      landUnit: 'Acre',
+      primaryCrop: 'Onion',
+      cropStage: 'Vegetative',
+      satelliteConsent: true,
+      marketPreference: 'mandi',
+    })
+    setLoading(false)
     await refresh()
   }
 
@@ -123,6 +176,20 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.buttonText}>{mode === 'signup' ? 'Create account' : 'Sign in'}</Text>
             )}
           </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.demoButton}
+            onPress={handleDemoLogin}
+            disabled={loading}
+          >
+            <Text style={styles.demoButtonText}>⚡ Enter as Demo Farmer (Instant Access)</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.footer}>Satellite-powered AgriTech for Indian farmers</Text>
@@ -183,5 +250,34 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   buttonText: { color: colors.text, fontWeight: '700' },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 14,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  demoButton: {
+    backgroundColor: colors.cardLight,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  demoButtonText: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   footer: { color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg, fontSize: 11 },
 })

@@ -1,15 +1,27 @@
 {
-  "name": "beejrakshak",
+  "name": "beejrakshak-client",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "concurrently -n web,aiml -c cyan,magenta \"npm run dev:client\" \"npm run dev:aiml\"",
-    "dev:client": "cd client && npm run dev",
-    "dev:aiml": "cd AIML && py -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload",
-    "build": "npm run build:client",
-    "build:client": "cd client && npm run build",
-    "install:all": "npm install && cd client && npm install && cd ../mobile && npm install"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "3.4.14",
+    "vite": "^5.4.21"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
   }
 }
