@@ -1,24 +1,20 @@
 {
   "rewrites": [
     {
-      "source": "/mandi/:path*",
-      "destination": "https://beejrakshak.onrender.com/mandi/:path*"
+      "source": "/mandi-api/:path*",
+      "destination": "https://cropwise-aiml.onrender.com/mandi/:path*"
+    },
+    {
+      "source": "/schemes-api/:path*",
+      "destination": "https://cropwise-aiml.onrender.com/schemes/:path*"
     },
     {
       "source": "/disease-api/:path*",
-      "destination": "https://beejrakshak.onrender.com/disease/:path*"
-    },
-    {
-      "source": "/disease/:path*",
-      "destination": "https://beejrakshak.onrender.com/disease/:path*"
+      "destination": "https://cropwise-aiml.onrender.com/disease/:path*"
     },
     {
       "source": "/yield-api/:path*",
-      "destination": "https://beejrakshak.onrender.com/yield/:path*"
-    },
-    {
-      "source": "/schemes/:path*",
-      "destination": "https://beejrakshak.onrender.com/schemes/:path*"
+      "destination": "https://cropwise-aiml.onrender.com/yield/:path*"
     },
     {
       "source": "/(.*)",
