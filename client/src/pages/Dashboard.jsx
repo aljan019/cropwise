@@ -3084,7 +3084,7 @@ function computeCropSuitability(crop, weather, season, options = {}) {
 function AdvisoryTab({ profile }) {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [yieldData, setYieldData] = useState({}); // { cropName: { yieldTpha, yieldPoints } }
+  const [yieldData, setYieldData] = useState({}); // { cropName: { yieldTpha, yieldPoints, source } }
   const [yieldLoading, setYieldLoading] = useState(false);
 
   // Derive season-to-model-season mapping
@@ -3105,7 +3105,27 @@ function AdvisoryTab({ profile }) {
     Soyabean: "Soyabean",
   };
 
-  const YIELD_BASE_URL = import.meta.env.VITE_YIELD_API_BASE || "/yield-api";
+  // Yield API base URL (defaults to relative path for Vite proxy)
+  const YIELD_BASE_URL = (import.meta.env.VITE_YIELD_API_BASE || "").replace(/\/$/, "") || "/yield-api";
+
+  // Initialize yield data with benchmarks immediately (no waiting)
+  const initializeYieldBenchmarks = () => {
+    const benchmarks = {};
+    CROP_DATABASE.forEach(c => {
+      const benchmark = getStateBenchmarkYield(profile?.state, c.name);
+      benchmarks[c.name] = {
+        yieldTpha: benchmark,
+        yieldPoints: Math.round(ADVISORY_YIELD_MAX_POINTS * 0.4),
+        source: "benchmark",
+      };
+    });
+    return benchmarks;
+  };
+
+  // Set initial benchmark data so UI never waits
+  useEffect(() => {
+    setYieldData(initializeYieldBenchmarks());
+  }, [profile?.state]);
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -3128,74 +3148,66 @@ function AdvisoryTab({ profile }) {
     profile?.state,
   ]);
 
-  // Fetch yield predictions from AI model for all supported crops
+  // Fetch yield predictions from AI model for all supported crops (non-blocking, with timeout)
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutMs = 5000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     const fetchYields = async () => {
       setYieldLoading(true);
       const state = (profile?.state || "Gujarat").toUpperCase();
       const district = (profile?.district || "SURAT").toUpperCase();
-      const area = Number(profile?.land_area) > 0 ? Number(profile.land_area) : 1;
+      const area = Number(profile?.land_area) > 0 ? Number(profile?.land_area) : 1;
       const season = getCurrentSeason();
       const modelSeason = getModelSeason(season);
-      const year = "2020-21"; // Use most recent available year
+      const year = "2020-21";
 
-      const results = {};
+      const results = { ...initializeYieldBenchmarks() }; // Start with benchmarks
       const cropsToFetch = CROP_DATABASE.filter(c => CROP_MODEL_NAMES[c.name]);
 
-      await Promise.allSettled(
-        cropsToFetch.map(async (c) => {
-          const modelCrop = CROP_MODEL_NAMES[c.name];
-          try {
-            const res = await fetch(`${YIELD_BASE_URL}/predict`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                state,
-                district,
-                crop: modelCrop,
-                year,
-                season: modelSeason,
-                area,
-              }),
-            });
-            if (!res.ok) throw new Error("API error");
-            const data = await res.json();
-            const yieldTpha = data.predicted_yield ?? 0;
-            // Benchmark for this state
-            const benchmark = getStateBenchmarkYield(profile?.state, c.name);
-            // Score: how much above/below benchmark. Normalized to 30 pts.
-            const ratio = benchmark > 0 ? yieldTpha / benchmark : 0;
-            const yieldPoints = Math.min(ADVISORY_YIELD_MAX_POINTS, Math.round(ratio * ADVISORY_YIELD_MAX_POINTS));
-            results[c.name] = { yieldTpha, yieldPoints, source: "model" };
-          } catch {
-            // Fallback to static benchmark
-            const benchmark = getStateBenchmarkYield(profile?.state, c.name);
-            // Give partial credit (50%) for benchmark-level performance
-            results[c.name] = {
-              yieldTpha: benchmark,
-              yieldPoints: Math.round(ADVISORY_YIELD_MAX_POINTS * 0.5),
-              source: "benchmark",
-            };
-          }
-        })
-      );
-
-      // Crops not in model get benchmark fallback
-      CROP_DATABASE.forEach(c => {
-        if (!results[c.name]) {
-          const benchmark = getStateBenchmarkYield(profile?.state, c.name);
-          results[c.name] = {
-            yieldTpha: benchmark,
-            yieldPoints: Math.round(ADVISORY_YIELD_MAX_POINTS * 0.4),
-            source: "benchmark",
-          };
+      try {
+        await Promise.allSettled(
+          cropsToFetch.map(async (c) => {
+            if (cancelled) return;
+            const modelCrop = CROP_MODEL_NAMES[c.name];
+            try {
+              const res = await fetch(`${YIELD_BASE_URL}/yield/predict`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ state, district, crop: modelCrop, year, season: modelSeason, area }),
+                signal: controller.signal,
+              });
+              clearTimeout(timer);
+              if (!res.ok) throw new Error(`API error: ${res.status}`);
+              const data = await res.json();
+              const yieldTpha = data.predicted_yield ?? 0;
+              const benchmark = getStateBenchmarkYield(profile?.state, c.name);
+              const ratio = benchmark > 0 ? yieldTpha / benchmark : 0;
+              const yieldPoints = Math.min(ADVISORY_YIELD_MAX_POINTS, Math.round(ratio * ADVISORY_YIELD_MAX_POINTS));
+              results[c.name] = { yieldTpha, yieldPoints, source: "model" };
+            } catch {
+              // Keep benchmark fallback (already in results)
+            }
+          })
+        );
+      } catch {
+        // Keep benchmark data on any unexpected error
+      } finally {
+        if (!cancelled) {
+          setYieldData(results);
+          setYieldLoading(false);
         }
-      });
-
-      setYieldData(results);
-      setYieldLoading(false);
+      }
     };
+
     fetchYields();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [profile?.state, profile?.district, profile?.land_area]);
 
   const season = getCurrentSeason();
