@@ -33,7 +33,6 @@ from mandi_intelligence.api.main import (
     RecommendRequest,
     RespondRequest,
 )
-from disease_detection.predict import router as disease_router
 from fertilizer_router import router as fertilizer_router
 
 try:
@@ -75,7 +74,6 @@ app.add_middleware(
 app.mount("/mandi", mandi_app)
 if scrapbot_loaded:
     app.mount("/schemes", scrapbot_app)
-app.include_router(disease_router, prefix="/disease")
 app.include_router(fertilizer_router, prefix="/api")
 
 @app.on_event("startup")
@@ -97,7 +95,6 @@ def root():
         "modules": {
             "mandi_intelligence": "/mandi/docs",
             "scheme_assistant": "/schemes/docs",
-            "disease_detection": "/disease/health",
         },
         "status": "operational"
     }
