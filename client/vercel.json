@@ -17,6 +17,10 @@
       "destination": "https://beejrakshak.onrender.com/yield/:path*"
     },
     {
+      "source": "/schemes/:path*",
+      "destination": "https://beejrakshak.onrender.com/schemes/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
