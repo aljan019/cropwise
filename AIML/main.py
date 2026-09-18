@@ -33,12 +33,11 @@ from mandi_intelligence.api.main import (
 from fertilizer_router import router as fertilizer_router
 
 try:
-    from disease_detection.predict import router as disease_router, warmup_model_in_background
+    from disease_detection.predict import router as disease_router
     disease_loaded = True
 except Exception as e:
     disease_loaded = False
     disease_router = None
-    warmup_model_in_background = None
     print("WARNING: Disease detection not loaded:", e)
 
 try:
@@ -111,9 +110,6 @@ async def startup_event():
     # FastAPI mounted apps don't auto-run their startup events
     from mandi_intelligence.api.main import startup_event as mandi_startup
     await mandi_startup()
-
-    if warmup_model_in_background:
-        warmup_model_in_background()
     
     print("All services initialized!")
 
