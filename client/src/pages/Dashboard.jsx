@@ -3623,9 +3623,9 @@ function AdvisoryTab({ profile }) {
                             : Number(profile.land_area);
                           const benchmarks = YIELD_BENCHMARKS[normalizeStateKey(profile.state)] || YIELD_BENCHMARKS.__default__;
                           const yieldPerHa = benchmarks[c.name] || 0;
-                          return (landHa * yieldPerHa).toFixed(1);
-                        })()} tonnes total
-                        {yieldPerHa && ` (${yieldPerHa.toFixed(2)} t/ha)`}
+                          const total = (landHa * yieldPerHa).toFixed(1);
+                          return `${total} tonnes total${yieldPerHa ? ` (${yieldPerHa.toFixed(2)} t/ha)` : ''}`;
+                        })()}
                       </p>
                     </div>
                   )}
