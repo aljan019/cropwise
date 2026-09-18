@@ -11,7 +11,9 @@
   const INCIDENT_TYPES = ['Flood', 'Drought', 'Hailstorm', 'Cyclone', 'Pest Attack', 'Unseasonal Rain']
 
   const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || '').replace(/\/$/, '')
-  const schemesBase = BACKEND_ORIGIN + '/schemes'
+  // Use the Vite proxy path '/schemes-api' in dev (rewritten to '/schemes' on backend).
+  // In production with VITE_BACKEND_ORIGIN set, fall back to the full backend URL.
+  const schemesBase = BACKEND_ORIGIN ? BACKEND_ORIGIN + '/schemes' : '/schemes-api'
   /** Normalize base64 for atob (padding, whitespace). */
   function normalizeBase64(b64) {
     if (!b64 || typeof b64 !== 'string') return ''
