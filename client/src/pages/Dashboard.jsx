@@ -4,7 +4,7 @@ import { loadRegistration } from "../lib/registration";
 import { fetchFarmWeatherBundle } from "../lib/farmWeather";
 import { GoogleTranslateWidget } from "../translation";
 import GovernmentSchemes from "../components/GovernmentSchemes";
-import DiseaseCheckUpload from "../components/DiseaseCheckUpload";
+
 import FertilizerAdvisor from "../components/FertilizerAdvisor";
 
 /* â”€â”€â”€ SVG icon paths â”€â”€â”€ */
@@ -45,7 +45,7 @@ const NAV_ITEMS = [
   { id: "mandi", label: "Mandi Prices", icon: ICONS.mandi },
   { id: "advisory", label: "Crop Advisory", icon: ICONS.advisory },
   { id: "fertilizer", label: "Fertilizer Plan", icon: ICONS.fertilizer },
-  { id: "disease", label: "Disease Scan", icon: ICONS.imageQuality },
+
   { id: "schemes", label: "Govt Schemes", icon: ICONS.schemes },
   { id: "alerts", label: "Alert System", icon: ICONS.alerts },
   { id: "calendar", label: "Adaptive Calendar", icon: ICONS.calendar },
@@ -273,7 +273,7 @@ export default function Dashboard({ session, onSignOut }) {
           {activeTab === "mandi" && <MandiTab profile={profile} />}
           {activeTab === "advisory" && <AdvisoryTab profile={profile} />}
           {activeTab === "fertilizer" && <FertilizerAdvisor profile={profile} />}
-          {activeTab === "disease" && <DiseaseCheckUpload profile={profile} />}
+
           {activeTab === "schemes" && <GovernmentSchemes profile={profile} />}
           {activeTab === "alerts" && <AlertSystemTab profile={profile} />}
           {activeTab === "calendar" && (
@@ -1221,35 +1221,6 @@ function computeSprayScore(current, forecastList) {
   return { score, label, factors };
 }
 
-function computeDiseasePressure(current) {
-  if (!current) return { score: 0, label: "No data", detail: "" };
-  const temp = current.main?.temp || 0;
-  const humidity = current.main?.humidity || 0;
-  const dewPoint = temp - (100 - humidity) / 5;
-  const leafWetness = Math.max(0, 100 - (temp - dewPoint) * 10);
-
-  let score = 0;
-  if (humidity > 90) score += 40;
-  else if (humidity > 80) score += 30;
-  else if (humidity > 70) score += 15;
-
-  if (temp >= 20 && temp <= 30) score += 35;
-  else if (temp >= 15 && temp <= 35) score += 20;
-  else score += 5;
-
-  score += Math.round(leafWetness * 0.25);
-  score = Math.min(100, score);
-
-  const label =
-    score >= 70 ? "High Risk" : score >= 40 ? "Moderate" : "Low Risk";
-  const detail =
-    score >= 70
-      ? "Fungal infection likely. Apply preventive fungicide immediately."
-      : score >= 40
-        ? "Conditions favor disease. Monitor crops closely for symptoms."
-        : "Disease pressure is low. Conditions unfavorable for pathogens.";
-  return { score, label, detail };
-}
 
 function computeHeatStress(current, cropName) {
   if (!current) return { score: 0, label: "No data", detail: "" };
@@ -1590,7 +1561,7 @@ function WeatherTab({ profile }) {
   /* Compute agricultural intelligence */
   const cropName = profile?.primary_crop || "";
   const spray = computeSprayScore(weather, forecast?.list);
-  const disease = computeDiseasePressure(weather);
+
   const heat = computeHeatStress(weather, cropName);
   const frost = computeFrostRisk(weather);
   const et0 = computeET0(forecast?.list);
@@ -1845,42 +1816,6 @@ function WeatherTab({ profile }) {
             );
           })()}
 
-          {/* Disease Pressure */}
-          {(() => {
-            const c = riskColor(disease.score, false);
-            return (
-              <div className="rounded-xl border border-stone-200 p-4 hover-lift">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🦠</span>
-                    <h4 className="font-bold text-stone-800 text-sm">
-                      Disease Pressure
-                    </h4>
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${RISK_BADGES[c]}`}
-                  >
-                    {disease.label}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-stone-400">Fungal Risk</span>
-                  <span className="font-bold text-stone-700">
-                    {disease.score}%
-                  </span>
-                </div>
-                <div className={`h-2.5 rounded-full ${RISK_BGS[c]}`}>
-                  <div
-                    className={`h-full rounded-full bg-gradient-to-r ${RISK_FILLS[c]} transition-all duration-1000`}
-                    style={{ width: `${disease.score}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-stone-500 mt-2">
-                  {disease.detail}
-                </p>
-              </div>
-            );
-          })()}
 
           {/* Heat Stress */}
           {(() => {

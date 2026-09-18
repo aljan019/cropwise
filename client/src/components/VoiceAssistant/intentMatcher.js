@@ -17,34 +17,7 @@ export const NAVIGATION_KEYWORDS = {
     hi: ["मंडी भाव", "बाजार भाव", "फसल का दाम", "मंडी", "मंडी दिखाओ", "भाव दिखाओ"],
     gu: ["મંડી ભાવ", "બજાર ભાવ", "પાકનો ભાવ", "મંડી", "મંડી બતાવો", "ભાવ બતાવો"],
   },
-  disease: {
-    en: [
-      "disease",
-      "crop disease",
-      "sick plant",
-      "leaf problem",
-      "check disease",
-      "disease check",
-      "disease scan",
-      "show me disease",
-    ],
-    hi: [
-      "बीमारी",
-      "फसल की बीमारी",
-      "पत्ती की समस्या",
-      "रोग जांच",
-      "रोग तपास",
-      "बीमारी जांच",
-    ],
-    gu: [
-      "રોગ",
-      "પાક રોગ",
-      "પાનની સમસ્યા",
-      "રોગ તપાસ",
-      "રોગ તપાસો",
-      "બીમારી",
-    ],
-  },
+
   fertilizer: {
     en: [
       "fertilizer",
@@ -110,25 +83,12 @@ const FAQ_ENTRIES = [
       gu: ["ક્રોપવાઇઝ શું છે", "બીજરક્ષક શું છે", "આ એપ વિશે"],
     },
     replies: {
-      en: "CropWise (BeejRakshak) is an agricultural AI platform for Indian farmers. It helps with mandi prices, crop advisory, fertilizer plans, disease detection, government schemes, weather, and alerts — all in one dashboard.",
-      hi: "क्रॉपवाइज (बीजरक्षक) भारतीय किसानों के लिए एक कृषि AI प्लेटफॉर्म है। यह मंडी भाव, फसल सलाह, उर्वरक योजना, रोग जांच, सरकारी योजनाएं, मौसम और अलर्ट — सब एक ही डैशबोर्ड में देता है।",
-      gu: "ક્રોપવાઇઝ (બીજરક્ષક) ભારતીય ખેડૂતો માટે કૃષિ AI પ્લેટફોર્મ છે. તે મંડી ભાવ, પાક સલાહ, ખાતર યોજના, રોગ તપાસ, સરકારી યોજનાઓ, હવામાન અને ચેતવણી — બધું એક ડેશબોર્ડમાં આપે છે.",
+      en: "CropWise (BeejRakshak) is an agricultural AI platform for Indian farmers. It helps with mandi prices, crop advisory, fertilizer plans, government schemes, weather, and alerts — all in one dashboard.",
+      hi: "क्रॉपवाइज (बीजरक्षक) भारतीय किसानों के लिए एक कृषि AI प्लेटफॉर्म है। यह मंडी भाव, फसल सलाह, उर्वरक योजना, सरकारी योजनाएं, मौसम और अलर्ट — सब एक ही डैशबोर्ड में देता है।",
+      gu: "ક્રોપવાઇઝ (બીજરક્ષક) ભારતીય ખેડૂતો માટે કૃષિ AI પ્લેટફોર્મ છે. તે મંડી ભાવ, પાક સલાહ, ખાતર યોજના, સરકારી યોજનાઓ, હવામાન અને ચેતવણી — બધું એક ડેશબોર્ડમાં આપે છે.",
     },
   },
-  {
-    id: "disease_how",
-    keywords: {
-      en: ["how do i check disease", "how to check disease", "how disease works"],
-      hi: ["बीमारी कैसे जांचें", "रोग कैसे जांचूं"],
-      gu: ["રોગ કેવી રીતે તપાસવો", "રોગ તપાસ કેવી રીતે"],
-    },
-    replies: {
-      en: "Open the Disease Scan tab, upload a clear photo of an affected leaf, and tap Analyze. The AI model will suggest the likely disease and basic treatment advice. Want me to take you there?",
-      hi: "रोग जांच टैब खोलें, प्रभावित पत्ती की स्पष्ट फोटो अपलोड करें और विश्लेषण पर टैप करें। AI मॉडल संभावित रोग और उपचार सलाह देगा। क्या मैं आपको वहां ले जाऊं?",
-      gu: "રોગ તપાસ ટેબ ખોલો, પ્રભાવિત પાનની સ્પષ્ટ ફોટો અપલોડ કરો અને Analyze પર ટેપ કરો. AI મોડેલ સંભવિત રોગ અને સારવાર સલાહ આપશે. શું હું તમને ત્યાં લઈ જાઉં?",
-    },
-    suggestTab: "disease",
-  },
+
   {
     id: "schemes_how",
     keywords: {
@@ -188,9 +148,9 @@ const FAQ_ENTRIES = [
       gu: ["મદદ", "તમે શું કરી શકો", "આદેશ", "કેવી રીતે વાપરવું"],
     },
     replies: {
-      en: "I can navigate you to Mandi Prices, Disease Scan, Fertilizer Plan, Govt Schemes, Alerts, Weather, Crop Advisory, and more. Try: \"Show mandi prices\" or \"Check crop disease\". You can type or use the microphone.",
-      hi: "मैं आपको मंडी भाव, रोग जांच, उर्वरक योजना, सरकारी योजनाएं, अलर्ट, मौसम, फसल सलाह आदि पर ले जा सकता हूं। कोशिश करें: \"मंडी भाव दिखाओ\" या \"फसल की बीमारी जांचें\"।",
-      gu: "હું તમને મંડી ભાવ, રોગ તપાસ, ખાતર યોજના, સરકારી યોજનાઓ, ચેતવણી, હવામાન, પાક સલાહ વગેરે પર લઈ જઈ શકું. પ્રયત્ન કરો: \"મંડી ભાવ બતાવો\" અથવા \"પાક રોગ તપાસો\".",
+      en: "I can navigate you to Mandi Prices, Fertilizer Plan, Govt Schemes, Alerts, Weather, Crop Advisory, and more. Try: \"Show mandi prices\" or \"Open fertilizer plan\". You can type or use the microphone.",
+      hi: "मैं आपको मंडी भाव, उर्वरक योजना, सरकारी योजनाएं, अलर्ट, मौसम, फसल सलाह आदि पर ले जा सकता हूं। कोशिश करें: \"मंडी भाव दिखाओ\" या \"उर्वरक योजना खोलो\"।",
+      gu: "હું તમને મંડી ભાવ, ખાતર યોજના, સરકારી યોજનાઓ, ચેતવણી, હવામાન, પાક સલાહ વગેરે પર લઈ જઈ શકું. પ્રયત્ન કરો: \"મંડી ભાવ બતાવો\" અથવા \"ખાતર યોજના ખોલો\".",
     },
   },
 ];
@@ -364,9 +324,9 @@ export async function processUserMessage(message, language = "en", options = {})
 export function getWelcomeMessage(language = "en") {
   const lang = languageOrEn(language);
   const messages = {
-    en: "Hello! I'm your CropWise assistant. Ask me to open Mandi Prices, Disease Scan, Fertilizer Plan, Schemes, or Alerts — in English, Hindi, or Gujarati.",
-    hi: "नमस्ते! मैं आपका क्रॉपवाइज सहायक हूं। मंडी भाव, रोग जांच, उर्वरक, योजनाएं या अलर्ट खोलने को कहें — हिंदी, अंग्रेजी या गुजराती में।",
-    gu: "નમસ્તે! હું તમારો ક્રોપવાઇઝ સહાયક છું. મંડી ભાવ, રોગ તપાસ, ખાતર, યોજનાઓ અથવા ચેતવણી ખોલવા કહો — ગુજરાતી, હિંદી અથવા અંગ્રેજીમાં.",
+    en: "Hello! I'm your CropWise assistant. Ask me to open Mandi Prices, Fertilizer Plan, Schemes, or Alerts — in English, Hindi, or Gujarati.",
+    hi: "नमस्ते! मैं आपका क्रॉपवाइज सहायक हूं। मंडी भाव, उर्वरक, योजनाएं या अलर्ट खोलने को कहें — हिंदी, अंग्रेजी या गुजराती में।",
+    gu: "નમસ્તે! હું તમારો ક્રોપવાઇઝ સહાયક છું. મંડી ભાવ, ખાતર, યોજનાઓ અથવા ચેતવણી ખોલવા કહો — ગુજરાતી, હિંદી અથવા અંગ્રેજીમાં.",
   };
   return messages[lang];
 }
