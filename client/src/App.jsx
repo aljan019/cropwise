@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Registration from './pages/Registration'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
+import OfficerView from './pages/OfficerView'
 import { TranslationProvider } from './translation/TranslationProvider'
 import VoiceAssistantWidget from './components/VoiceAssistant/VoiceAssistantWidget'
 
@@ -88,6 +89,19 @@ function App() {
         />
 
         <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* Officer / FPO Command Center */}
+        <Route
+          path="/officer-view"
+          element={
+            !session
+              ? <Navigate to="/login" replace />
+              : !registrationComplete
+                ? <Navigate to="/registration" replace />
+                : <OfficerView session={session} onSignOut={signOut} />
+          }
+        />
+
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       <VoiceAssistantWidget />

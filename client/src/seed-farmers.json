@@ -15,7 +15,9 @@
     "sowing_date": "2026-06-24",
     "crop_stage": "flowering",
     "satellite_consent": true,
-    "market_preference": "mandi"
+    "market_preference": "mandi",
+    "moisture_anomaly": "high",
+    "disease_risk": "moderate"
   },
   {
     "id": "fpo-farmer-002",
@@ -69,7 +71,10 @@
     "sowing_date": "2026-06-19",
     "crop_stage": "flowering",
     "satellite_consent": true,
-    "market_preference": "mandi"
+    "market_preference": "mandi",
+    "flood_flag": true,
+    "pending_insurance_claim": true,
+    "disease_pressure": 75
   },
   {
     "id": "fpo-farmer-005",
@@ -87,7 +92,9 @@
     "sowing_date": "2026-06-28",
     "crop_stage": "flowering",
     "satellite_consent": true,
-    "market_preference": "mandi"
+    "market_preference": "mandi",
+    "moisture_anomaly": "high",
+    "disease_risk": "high"
   },
   {
     "id": "fpo-farmer-006",
@@ -105,7 +112,8 @@
     "sowing_date": "2026-07-05",
     "crop_stage": "vegetative",
     "satellite_consent": true,
-    "market_preference": "mandi"
+    "market_preference": "mandi",
+    "moisture_anomaly": "low"
   },
   {
     "id": "fpo-farmer-007",
@@ -141,6 +149,7 @@
     "sowing_date": "2026-06-22",
     "crop_stage": "flowering",
     "satellite_consent": true,
-    "market_preference": "mandi"
+    "market_preference": "mandi",
+    "disease_risk": "moderate"
   }
 ]

@@ -227,6 +227,20 @@ export default function Dashboard({ session, onSignOut }) {
             <GoogleTranslateWidget />
           </div>
 
+          {/* Switch to Officer / FPO View button */}
+          <button
+            type="button"
+            onClick={() => navigate("/officer-view")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 text-xs font-bold transition-all shadow-sm hover:shadow-md shrink-0 active:scale-95"
+            title="Switch to Officer / FPO Command Center"
+            aria-label="Switch to Officer / FPO View"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse shrink-0" />
+            <span className="hidden sm:inline">Switch to</span>
+            <span>Officer View</span>
+            <span className="text-indigo-200 font-normal">→</span>
+          </button>
+
           {/* Notification bell */}
           <button
             onClick={() => setActiveTab("alerts")}
